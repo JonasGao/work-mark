@@ -82,31 +82,34 @@ function getSpan(rows: Row[], index: number) {
   const s = second % 60;
   const m = second > s ? ((second - s) / 60 % 60) : 0;
   const h = second > (second % 3600) ? (second / 60 / 60) : 0;
-  return `${ h }:${ m }:${ s.toFixed(3) }`;
+  return `${ h.toFixed(0) }:${ m }:${ s.toFixed(3) }`;
 }
 
 export default () => {
   const [rows, addRow, updateRow, resetRows] = useRows();
 
   return (
-    <div>
-      <button onClick={ addRow }>打卡</button>
-      <button onClick={ resetRows }>重置</button>
-      <table>
+    <div className={ styles.main }>
+      <div>
+        <button className={styles.btn} onClick={ addRow }>打卡</button>
+        <button className={styles.btn} onClick={ resetRows }>重置</button>
+      </div>
+      <table className={ styles.rows }>
         <tbody>
         {
           rows.map((row, index) => (
             <tr key={ row.time }>
-              <td>{ getTime(row.time) }</td>
+              <td className={styles.colTime}>{ getTime(row.time) }</td>
               <td>
                 <input
                   type="text"
                   value={ row.desc }
                   placeholder="请输入内容"
                   onChange={ e => updateRow(row, e.target.value) }
+                  className={ styles.descInput }
                 />
               </td>
-              <td>
+              <td className={styles.colSpan}>
                 { getSpan(rows, index) }
               </td>
             </tr>
