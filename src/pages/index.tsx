@@ -87,19 +87,23 @@ function getSpan(rows: Row[], index: number) {
 
 export default () => {
   const [rows, addRow, updateRow, resetRows] = useRows();
-
+  const doResetRows = () => {
+    if (confirm('确定重置？')) {
+      resetRows();
+    }
+  };
   return (
     <div className={ styles.main }>
       <div>
-        <button className={styles.btn} onClick={ addRow }>打卡</button>
-        <button className={styles.btn} onClick={ resetRows }>重置</button>
+        <button className={ styles.btn } onClick={ addRow }>打卡</button>
+        <button className={ styles.btn } onClick={ doResetRows }>重置</button>
       </div>
       <table className={ styles.rows }>
         <tbody>
         {
           rows.map((row, index) => (
             <tr key={ row.time }>
-              <td className={styles.colTime}>{ getTime(row.time) }</td>
+              <td className={ styles.colTime }>{ getTime(row.time) }</td>
               <td>
                 <input
                   type="text"
@@ -109,7 +113,7 @@ export default () => {
                   className={ styles.descInput }
                 />
               </td>
-              <td className={styles.colSpan}>
+              <td className={ styles.colSpan }>
                 { getSpan(rows, index) }
               </td>
             </tr>
