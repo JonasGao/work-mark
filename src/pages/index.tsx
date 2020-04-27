@@ -71,9 +71,9 @@ function useRows(): [Row[], AddRow, UpdateRow, ResetRows] {
   return [rows, addRow, updateRow, resetRows];
 }
 
-function getSpan(rows: Row[], index: number) {
+function getSpan(rows: Row[], index: number): [number, number, number] {
   if (index < 1) {
-    return 0;
+    return [0, 0, 0];
   }
   const curr = rows[ index ];
   const latest = rows[ index - 1 ];
@@ -82,21 +82,62 @@ function getSpan(rows: Row[], index: number) {
   const s = second % 60;
   const m = second > s ? ((second - s) / 60 % 60) : 0;
   const h = second > (second % 3600) ? (second / 60 / 60) : 0;
+  return [h, m, s];
+}
+
+function formatSpan(rows: Row[], index: number) {
+  const [h, m, s] = getSpan(rows, index);
   return `${ h.toFixed(0) }:${ m }:${ s.toFixed(3) }`;
+}
+
+function exportSpan(rows: Row[], index: number) {
+  let [h, m] = getSpan(rows, index);
+  console.info(1, h, m, index, rows);
+  for (let i = index - 1; i >= 0; i--) {
+    const r = rows[ i ];
+    console.log(2, r.desc);
+    if (r.desc) {
+      break;
+    }
+    const [h1, m1] = getSpan(rows, i);
+    console.log(3, h1, m1);
+    h += h1;
+    m += m1;
+  }
+  let str = '';
+  if (h) {
+    str += h.toFixed(0) + '小时';
+  }
+  if (m) {
+    str += m.toFixed(0) + '分钟';
+  }
+  return str;
 }
 
 export default () => {
   const [rows, addRow, updateRow, resetRows] = useRows();
+  const [exportContent, setExportContent] = useState<string>();
   const doResetRows = () => {
     if (confirm('确定重置？')) {
       resetRows();
     }
+  };
+  const doExport = () => {
+    const content = rows.map((r, index) => {
+      if (!r.desc) {
+        return null;
+      }
+      const span = exportSpan(rows, index);
+      return `${ r.desc }（${ span }）`;
+    }).filter(s => !!s).join('\n');
+    setExportContent(content);
   };
   return (
     <div className={ styles.main }>
       <div>
         <button className={ styles.btn } onClick={ addRow }>打卡</button>
         <button className={ styles.btn } onClick={ doResetRows }>重置</button>
+        <button className={ styles.btn } onClick={ doExport }>导出</button>
       </div>
       <table className={ styles.rows }>
         <tbody>
@@ -114,13 +155,18 @@ export default () => {
                 />
               </td>
               <td className={ styles.colSpan }>
-                { getSpan(rows, index) }
+                { formatSpan(rows, index) }
               </td>
             </tr>
           ))
         }
         </tbody>
       </table>
+      <textarea
+        cols={ 100 }
+        rows={ 20 }
+        value={ exportContent }
+      />
     </div>
   );
 }
