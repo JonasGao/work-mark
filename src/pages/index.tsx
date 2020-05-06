@@ -82,12 +82,12 @@ function getSpan(rows: Row[], index: number): [number, number, number] {
   const s = second % 60;
   const m = second > s ? ((second - s) / 60 % 60) : 0;
   const h = second > (second % 3600) ? (second / 60 / 60) : 0;
-  return [h, m, s];
+  return [Math.floor(h), Math.floor(m), s];
 }
 
 function formatSpan(rows: Row[], index: number) {
   const [h, m, s] = getSpan(rows, index);
-  return `${ h.toFixed(0) }:${ m }:${ s.toFixed(3) }`;
+  return `${ h }:${ m }:${ s.toFixed(3) }`;
 }
 
 function exportSpan(rows: Row[], index: number) {
