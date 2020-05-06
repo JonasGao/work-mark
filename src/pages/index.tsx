@@ -1,4 +1,11 @@
 import React, { useState } from 'react';
+import CssBaseline from '@material-ui/core/CssBaseline';
+import { createMuiTheme, ThemeProvider, makeStyles, createStyles, Theme } from '@material-ui/core/styles';
+import Button from '@material-ui/core/Button';
+import TextField from '@material-ui/core/TextField';
+import Grid from '@material-ui/core/Grid';
+import Paper from '@material-ui/core/Paper';
+import '../sw';
 import styles from './index.less';
 
 interface Row {
@@ -114,14 +121,27 @@ function exportSpan(rows: Row[], index: number) {
   return str;
 }
 
+const useStyles = makeStyles((theme: Theme) =>
+  createStyles({
+    root: {
+      '& > *': {
+        margin: theme.spacing(1),
+      },
+    },
+  }),
+);
+
 export default () => {
   const [rows, addRow, updateRow, resetRows] = useRows();
+
   const [exportContent, setExportContent] = useState<string>();
+
   const doResetRows = () => {
     if (confirm('确定重置？')) {
       resetRows();
     }
   };
+
   const doExport = () => {
     const content = rows.map((r, index) => {
       if (!r.desc) {
@@ -132,41 +152,57 @@ export default () => {
     }).filter(s => !!s).join('\n');
     setExportContent(content);
   };
+
+  const theme = createMuiTheme({
+    palette: {
+      type: 'dark',
+    },
+  });
+
+  const classes = useStyles();
+
   return (
-    <div className={ styles.main }>
-      <div>
-        <button className={ styles.btn } onClick={ addRow }>打卡</button>
-        <button className={ styles.btn } onClick={ doResetRows }>重置</button>
-        <button className={ styles.btn } onClick={ doExport }>导出</button>
-      </div>
-      <table className={ styles.rows }>
-        <tbody>
-        {
-          rows.map((row, index) => (
-            <tr key={ row.time }>
-              <td className={ styles.colTime }>{ getTime(row.time) }</td>
-              <td>
-                <input
-                  type="text"
-                  value={ row.desc }
-                  placeholder="请输入内容"
-                  onChange={ e => updateRow(row, e.target.value) }
-                  className={ styles.descInput }
-                />
-              </td>
-              <td className={ styles.colSpan }>
-                { formatSpan(rows, index) }
-              </td>
-            </tr>
-          ))
-        }
-        </tbody>
-      </table>
-      <textarea
-        cols={ 100 }
-        rows={ 20 }
-        value={ exportContent }
-      />
-    </div>
+    <ThemeProvider theme={ theme }>
+      <CssBaseline/>
+      <Paper>
+        <div className={ classes.root }>
+          <Button className={ styles.btn } variant="contained" color="primary" onClick={ addRow }>打卡</Button>
+          <Button className={ styles.btn } variant="contained" color="secondary" onClick={ doResetRows }>重置</Button>
+          <Button className={ styles.btn } variant="contained" onClick={ doExport }>导出</Button>
+        </div>
+        <Grid
+          container
+          spacing={ 3 }
+          justify="center"
+          alignItems="center"
+        >
+          {
+            rows.map((row, index) => (
+              <>
+                <Grid item xs={ 1 }>{ getTime(row.time) }</Grid>
+                <Grid item xs={ 1 }>
+                  { formatSpan(rows, index) }
+                </Grid>
+                <Grid item xs={ 10 }>
+                  <TextField
+                    type="text"
+                    fullWidth
+                    value={ row.desc }
+                    placeholder="请输入内容"
+                    onChange={ e => updateRow(row, e.target.value) }
+                  />
+                </Grid>
+              </>
+            ))
+          }
+        </Grid>
+        <TextField
+          multiline
+          rows={ 20 }
+          fullWidth
+          value={ exportContent }
+        />
+      </Paper>
+    </ThemeProvider>
   );
 }
