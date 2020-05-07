@@ -1,16 +1,23 @@
 import React, { useState } from 'react';
 import CssBaseline from '@material-ui/core/CssBaseline';
-import { createMuiTheme, ThemeProvider, makeStyles, createStyles, Theme } from '@material-ui/core/styles';
+import {
+  createMuiTheme,
+  ThemeProvider,
+  makeStyles,
+  createStyles,
+  Theme,
+} from '@material-ui/core/styles';
 import Button from '@material-ui/core/Button';
 import TextField from '@material-ui/core/TextField';
 import Grid from '@material-ui/core/Grid';
 import Paper from '@material-ui/core/Paper';
 import '../sw';
 import styles from './index.less';
+import { Card, CardContent, Container } from '@material-ui/core';
 
 interface Row {
-  time: number,
-  desc: string
+  time: number;
+  desc: string;
 }
 
 type AddRow = () => void;
@@ -21,7 +28,7 @@ type UpdateRow = (row: Row, desc: string) => void;
 
 function getTime(timestamp: number) {
   const date = new Date(timestamp);
-  return `${ date.getHours() }:${ date.getMinutes() }:${ date.getSeconds() }.${ date.getMilliseconds() }`;
+  return `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}.${date.getMilliseconds()}`;
 }
 
 class LocalRows {
@@ -62,15 +69,17 @@ function useRows(): [Row[], AddRow, UpdateRow, ResetRows] {
     saveRows(newRows);
   };
   const updateRow: UpdateRow = (row, desc) => {
-    saveRows(rows.map(r => {
-      if (r === row) {
-        return {
-          time: r.time,
-          desc: desc,
-        };
-      }
-      return r;
-    }));
+    saveRows(
+      rows.map(r => {
+        if (r === row) {
+          return {
+            time: r.time,
+            desc: desc,
+          };
+        }
+        return r;
+      }),
+    );
   };
   const resetRows = () => {
     saveRows([]);
@@ -82,26 +91,26 @@ function getSpan(rows: Row[], index: number): [number, number, number] {
   if (index < 1) {
     return [0, 0, 0];
   }
-  const curr = rows[ index ];
-  const latest = rows[ index - 1 ];
+  const curr = rows[index];
+  const latest = rows[index - 1];
   const span = curr.time - latest.time;
   const second = span / 1000;
   const s = second % 60;
-  const m = second > s ? ((second - s) / 60 % 60) : 0;
-  const h = second > (second % 3600) ? (second / 60 / 60) : 0;
+  const m = second > s ? ((second - s) / 60) % 60 : 0;
+  const h = second > second % 3600 ? second / 60 / 60 : 0;
   return [Math.floor(h), Math.floor(m), s];
 }
 
 function formatSpan(rows: Row[], index: number) {
   const [h, m, s] = getSpan(rows, index);
-  return `${ h }:${ m }:${ s.toFixed(3) }`;
+  return `${h}:${m}:${s.toFixed(3)}`;
 }
 
 function exportSpan(rows: Row[], index: number) {
   let [h, m] = getSpan(rows, index);
   console.info(1, h, m, index, rows);
   for (let i = index - 1; i >= 0; i--) {
-    const r = rows[ i ];
+    const r = rows[i];
     console.log(2, r.desc);
     if (r.desc) {
       break;
@@ -143,13 +152,16 @@ export default () => {
   };
 
   const doExport = () => {
-    const content = rows.map((r, index) => {
-      if (!r.desc) {
-        return null;
-      }
-      const span = exportSpan(rows, index);
-      return `${ r.desc }（${ span }）`;
-    }).filter(s => !!s).join('\n');
+    const content = rows
+      .map((r, index) => {
+        if (!r.desc) {
+          return null;
+        }
+        const span = exportSpan(rows, index);
+        return `${r.desc}（${span}）`;
+      })
+      .filter(s => !!s)
+      .join('\n');
     setExportContent(content);
   };
 
@@ -162,47 +174,55 @@ export default () => {
   const classes = useStyles();
 
   return (
-    <ThemeProvider theme={ theme }>
-      <CssBaseline/>
-      <Paper>
-        <div className={ classes.root }>
-          <Button className={ styles.btn } variant="contained" color="primary" onClick={ addRow }>打卡</Button>
-          <Button className={ styles.btn } variant="contained" color="secondary" onClick={ doResetRows }>重置</Button>
-          <Button className={ styles.btn } variant="contained" onClick={ doExport }>导出</Button>
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <Container>
+        <div className={classes.root}>
+          <Button
+            className={styles.btn}
+            variant="contained"
+            color="primary"
+            onClick={addRow}
+          >
+            打卡
+          </Button>
+          <Button
+            className={styles.btn}
+            variant="contained"
+            color="secondary"
+            onClick={doResetRows}
+          >
+            重置
+          </Button>
+          <Button className={styles.btn} variant="contained" onClick={doExport}>
+            导出
+          </Button>
         </div>
-        <Grid
-          container
-          spacing={ 3 }
-          justify="center"
-          alignItems="center"
-        >
-          {
-            rows.map((row, index) => (
-              <>
-                <Grid item xs={ 1 }>{ getTime(row.time) }</Grid>
-                <Grid item xs={ 1 }>
-                  { formatSpan(rows, index) }
-                </Grid>
-                <Grid item xs={ 10 }>
-                  <TextField
-                    type="text"
-                    fullWidth
-                    value={ row.desc }
-                    placeholder="请输入内容"
-                    onChange={ e => updateRow(row, e.target.value) }
-                  />
-                </Grid>
-              </>
-            ))
-          }
+        <Grid container justify="center" alignItems="center">
+          {rows.map((row, index) => (
+            <>
+              <Grid item xs={2} sm={2} md={1}>
+                {getTime(row.time)}
+              </Grid>
+              <Grid item xs={2} sm={2} md={1}>
+                {formatSpan(rows, index)}
+              </Grid>
+              <Grid item xs={8} sm={8} md={10}>
+                <TextField
+                  type="text"
+                  fullWidth
+                  value={row.desc}
+                  placeholder="请输入内容"
+                  onChange={e => updateRow(row, e.target.value)}
+                />
+              </Grid>
+            </>
+          ))}
+          <Grid item xs={12}>
+            <TextField multiline rows={20} fullWidth value={exportContent} />
+          </Grid>
         </Grid>
-        <TextField
-          multiline
-          rows={ 20 }
-          fullWidth
-          value={ exportContent }
-        />
-      </Paper>
+      </Container>
     </ThemeProvider>
   );
-}
+};
