@@ -13,81 +13,90 @@ import Grid from '@material-ui/core/Grid';
 import Paper from '@material-ui/core/Paper';
 import '../sw';
 import styles from './index.less';
-import { Card, CardContent, Container } from '@material-ui/core';
+import Container from '@material-ui/core/Container';
+import TableContainer from '@material-ui/core/TableContainer';
+import Table from '@material-ui/core/Table';
+import TableBody from '@material-ui/core/TableBody';
+import TableRow from '@material-ui/core/TableRow';
+import TableHead from '@material-ui/core/TableHead';
+import TableCell from '@material-ui/core/TableCell';
+import IconButton from '@material-ui/core/IconButton';
+import DeleteIcon from '@material-ui/icons/Delete';
+import EditIcon from '@material-ui/icons/Edit';
+import { Box, MenuItem, Select, Typography } from '@material-ui/core';
 
-interface Row {
+/**
+ * 表示一个工作的状态，是开始，还是结束，还是正在进行
+ */
+type WorkStatus = 'start' | 'finish' | 'doing';
+
+/**
+ * 表示当前在处理的一个工作。比如在某某时间开始做某某事。比如在某某时间正在做，比如在某某时间做完
+ * 某事
+ */
+interface Work {
+  /**
+   * 表示当前这个工作的状态
+   */
+  status: WorkStatus;
+  /**
+   * 当前打卡记录的时间
+   */
   time: number;
+  /**
+   * 描述，比如具体是什么事情
+   */
   desc: string;
 }
 
-type AddRow = () => void;
+/**
+ * 追加一个指定状态的工作
+ */
+type AppendWork = (status: WorkStatus) => void;
 
-type ResetRows = () => void;
+/**
+ * 在指定位置插入一个指定状态的工作
+ */
+type InsertWork = (index: number, status: WorkStatus) => void;
 
-type UpdateRow = (row: Row, desc: string) => void;
+/**
+ * 重置所有数据
+ */
+type Reset = () => void;
 
-function getTime(timestamp: number) {
+/**
+ * 更新指定位置的工作数据
+ */
+type UpdateWork = (index: number, row: Work) => void;
+
+/**
+ * 删除指定位置的工作数据
+ */
+type RemoveWork = (index: number) => void;
+
+type WorkState = [
+  Work[],
+  AppendWork,
+  InsertWork,
+  Reset,
+  UpdateWork,
+  RemoveWork,
+];
+
+/**
+ * 格式化时间戳，转成 HH:mm:ss 格式的时间
+ *
+ * @param timestamp
+ */
+function getTime(timestamp?: number) {
+  if (!timestamp) {
+    return '';
+  }
   const date = new Date(timestamp);
   return `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}.${date.getMilliseconds()}`;
 }
 
-class LocalRows {
-  static KEY = 'local-mark-rows';
-
-  loadRows(): Row[] {
-    const item = window.localStorage.getItem(LocalRows.KEY);
-    if (item) {
-      return JSON.parse(item);
-    }
-    return [];
-  }
-
-  writeRows(rows: Row[]) {
-    const json = JSON.stringify(rows);
-    window.localStorage.setItem(LocalRows.KEY, json);
-  }
-}
-
-const localRows = new LocalRows();
-
-function initRows() {
-  return localRows.loadRows();
-}
-
-function useRows(): [Row[], AddRow, UpdateRow, ResetRows] {
-  const [rows, setRows] = useState(initRows);
-  const saveRows = (rows: Row[]) => {
-    localRows.writeRows(rows);
-    setRows(rows);
-  };
-  const addRow: AddRow = () => {
-    const row = {
-      time: new Date().getTime(),
-      desc: '',
-    };
-    const newRows = [...rows, row];
-    saveRows(newRows);
-  };
-  const updateRow: UpdateRow = (row, desc) => {
-    saveRows(
-      rows.map(r => {
-        if (r === row) {
-          return {
-            time: r.time,
-            desc: desc,
-          };
-        }
-        return r;
-      }),
-    );
-  };
-  const resetRows = () => {
-    saveRows([]);
-  };
-  return [rows, addRow, updateRow, resetRows];
-}
-
-function getSpan(rows: Row[], index: number): [number, number, number] {
+function getSpan(rows: Work[], index: number): [number, number, number] {
   if (index < 1) {
     return [0, 0, 0];
   }
@@ -101,12 +110,19 @@ function getSpan(rows: Row[], index: number): [number, number, number] {
   return [Math.floor(h), Math.floor(m), s];
 }
 
-function formatSpan(rows: Row[], index: number) {
+function formatSpan(rows: Work[], index: number) {
   const [h, m, s] = getSpan(rows, index);
-  return `${h}:${m}:${s.toFixed(3)}`;
+  let str = '';
+  if (h) {
+    str += h.toFixed(0) + '小时';
+  }
+  if (m) {
+    str += m.toFixed(0) + '分钟';
+  }
+  return `${str} ${s.toFixed(0)} 秒`;
 }
 
-function exportSpan(rows: Row[], index: number) {
+function exportSpan(rows: Work[], index: number) {
   let [h, m] = getSpan(rows, index);
   console.info(1, h, m, index, rows);
   for (let i = index - 1; i >= 0; i--) {
@@ -130,6 +146,63 @@ function exportSpan(rows: Row[], index: number) {
   return str;
 }
 
+class LocalWorkRepo {
+  static KEY = 'local-mark-rows';
+
+  load(): Work[] {
+    const item = window.localStorage.getItem(LocalWorkRepo.KEY);
+    if (item) {
+      return JSON.parse(item);
+    }
+    return [];
+  }
+
+  write(rows: Work[]) {
+    const json = JSON.stringify(rows);
+    window.localStorage.setItem(LocalWorkRepo.KEY, json);
+  }
+}
+
+const LOCAL_WORK_REPO = new LocalWorkRepo();
+
+/**
+ * 工作数据
+ */
+function useWorks(): WorkState {
+  const [rows, setRows] = useState(LOCAL_WORK_REPO.load());
+  const save = (rows: Work[]) => {
+    LOCAL_WORK_REPO.write(rows);
+    setRows(rows);
+  };
+  const append: AppendWork = status => {
+    const row: Work = {
+      status,
+      time: new Date().getTime(),
+      desc: '',
+    };
+    save([...rows, row]);
+  };
+  const insert: InsertWork = (index, status) => {
+    const row: Work = {
+      status,
+      time: new Date().getTime(),
+      desc: '',
+    };
+    save([...rows.slice(0, index), row, ...rows.splice(index)]);
+  };
+  const reset: Reset = () => {
+    save([]);
+  };
+  const update: UpdateWork = (index, row) => {
+    save([...rows.slice(0, index), row, ...rows.splice(index + 1)]);
+  };
+  const remove: RemoveWork = index => {
+    rows.splice(index, 1);
+    save([...rows]);
+  };
+  return [rows, append, insert, reset, update, remove];
+}
+
 const useStyles = makeStyles((theme: Theme) =>
   createStyles({
     root: {
@@ -141,28 +214,28 @@ const useStyles = makeStyles((theme: Theme) =>
 );
 
 export default () => {
-  const [rows, addRow, updateRow, resetRows] = useRows();
+  const [rows, append, insert, reset, update, remove] = useWorks();
 
   const [exportContent, setExportContent] = useState<string>();
 
   const doResetRows = () => {
     if (confirm('确定重置？')) {
-      resetRows();
+      reset();
     }
   };
 
   const doExport = () => {
-    const content = rows
-      .map((r, index) => {
-        if (!r.desc) {
-          return null;
-        }
-        const span = exportSpan(rows, index);
-        return `${r.desc}（${span}）`;
-      })
-      .filter(s => !!s)
-      .join('\n');
-    setExportContent(content);
+    // const content = rows
+    //   .map((r, index) => {
+    //     if (!r.desc) {
+    //       return null;
+    //     }
+    //     const span = exportSpan(rows, index);
+    //     return `${r.desc}（${span}）`;
+    //   })
+    //   .filter(s => !!s)
+    //   .join('\n');
+    // setExportContent(content);
   };
 
   const theme = createMuiTheme({
@@ -182,7 +255,23 @@ export default () => {
             className={styles.btn}
             variant="contained"
             color="primary"
-            onClick={addRow}
+            onClick={() => append('start')}
+          >
+            开始
+          </Button>
+          <Button
+            className={styles.btn}
+            variant="contained"
+            color="primary"
+            onClick={() => append('finish')}
+          >
+            结束
+          </Button>
+          <Button
+            className={styles.btn}
+            variant="contained"
+            color="primary"
+            onClick={() => append('doing')}
           >
             打卡
           </Button>
@@ -198,26 +287,42 @@ export default () => {
             导出
           </Button>
         </div>
-        <Grid container justify="center" alignItems="center">
+        <Paper>
           {rows.map((row, index) => (
-            <>
-              <Grid item xs={2} sm={2} md={1}>
-                {getTime(row.time)}
-              </Grid>
-              <Grid item xs={2} sm={2} md={1}>
-                {formatSpan(rows, index)}
-              </Grid>
-              <Grid item xs={8} sm={8} md={10}>
-                <TextField
-                  type="text"
-                  fullWidth
-                  value={row.desc}
-                  placeholder="请输入内容"
-                  onChange={e => updateRow(row, e.target.value)}
-                />
-              </Grid>
-            </>
+            <Box display={'flex'} alignItems={'center'}>
+              <Typography display={'inline'}>{getTime(row.time)}</Typography>
+              <Select
+                value={row.status}
+                onChange={e =>
+                  update(index, {
+                    ...row,
+                    status: e.target.value as WorkStatus,
+                  })
+                }
+              >
+                <MenuItem value={'start'}>开始做</MenuItem>
+                <MenuItem value={'finish'}>结束</MenuItem>
+                <MenuItem value={'doing'}>正在做</MenuItem>
+              </Select>
+              <TextField
+                type="text"
+                value={row.desc}
+                placeholder="请输入内容"
+                onChange={e => update(index, { ...row, desc: e.target.value })}
+              />
+              <Typography display={'inline'}>
+                {'用时 ' + formatSpan(rows, index)}
+              </Typography>
+              <IconButton onClick={() => remove(index)}>
+                <DeleteIcon />
+              </IconButton>
+              <IconButton>
+                <EditIcon />
+              </IconButton>
+            </Box>
           ))}
+        </Paper>
+        <Grid container justify="center" alignItems="center">
           <Grid item xs={12}>
             <TextField multiline rows={20} fullWidth value={exportContent} />
           </Grid>
