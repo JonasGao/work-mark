@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import CssBaseline from '@material-ui/core/CssBaseline';
+import useMediaQuery from '@material-ui/core/useMediaQuery';
 import {
   createMuiTheme,
   ThemeProvider,
@@ -21,7 +22,7 @@ import TableRow from '@material-ui/core/TableRow';
 import TableHead from '@material-ui/core/TableHead';
 import TableCell from '@material-ui/core/TableCell';
 import IconButton from '@material-ui/core/IconButton';
-import DeleteIcon from '@material-ui/icons/Delete';
+import { Close, Add, Save } from '@material-ui/icons';
 import EditIcon from '@material-ui/icons/Edit';
 import { Box, MenuItem, Select, Typography } from '@material-ui/core';
 
@@ -42,7 +43,7 @@ interface Work {
   /**
    * 当前打卡记录的时间
    */
-  time: number;
+  time?: number;
   /**
    * 描述，比如具体是什么事情
    */
@@ -57,7 +58,7 @@ type AppendWork = (status: WorkStatus) => void;
 /**
  * 在指定位置插入一个指定状态的工作
  */
-type InsertWork = (index: number, status: WorkStatus) => void;
+type InsertWork = (index: number) => void;
 
 /**
  * 重置所有数据
@@ -101,7 +102,16 @@ function getSpan(rows: Work[], index: number): [number, number, number] {
     return [0, 0, 0];
   }
   const curr = rows[index];
+  if (!curr.time) {
+    return [0, 0, 0];
+  }
   const latest = rows[index - 1];
+  if (!latest.time) {
+    return [0, 0, 0];
+  }
+  if (curr.time < latest.time) {
+    return [0, 0, 0];
+  }
   const span = curr.time - latest.time;
   const second = span / 1000;
   const s = second % 60;
@@ -182,10 +192,9 @@ function useWorks(): WorkState {
     };
     save([...rows, row]);
   };
-  const insert: InsertWork = (index, status) => {
+  const insert: InsertWork = index => {
     const row: Work = {
-      status,
-      time: new Date().getTime(),
+      status: 'start',
       desc: '',
     };
     save([...rows.slice(0, index), row, ...rows.splice(index)]);
@@ -194,7 +203,8 @@ function useWorks(): WorkState {
     save([]);
   };
   const update: UpdateWork = (index, row) => {
-    save([...rows.slice(0, index), row, ...rows.splice(index + 1)]);
+    rows[index] = row;
+    save([...rows]);
   };
   const remove: RemoveWork = index => {
     rows.splice(index, 1);
@@ -212,6 +222,35 @@ const useStyles = makeStyles((theme: Theme) =>
     },
   }),
 );
+
+const TimeEditor = (props: { onUpdate: (time: number) => void }) => {
+  const [value, setValue] = useState();
+
+  return (
+    <TextField
+      type="text"
+      value={value}
+      placeholder="请输入时间 HH:mm:ss"
+      onChange={e => {
+        const v = e.target.value;
+        if (!v) {
+          return;
+        }
+        const strings = v.split(':');
+        if (strings.length != 3) {
+          return;
+        }
+        const date = new Date();
+        date.setHours(parseInt(strings[0]));
+        date.setMinutes(parseInt(strings[1]), parseInt(strings[2]));
+        let time = date.getTime();
+        if (isNaN(time)) {
+        }
+        props.onUpdate(time);
+      }}
+    />
+  );
+};
 
 export default () => {
   const [rows, append, insert, reset, update, remove] = useWorks();
@@ -238,11 +277,17 @@ export default () => {
     // setExportContent(content);
   };
 
-  const theme = createMuiTheme({
-    palette: {
-      type: 'dark',
-    },
-  });
+  const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
+
+  const theme = React.useMemo(
+    () =>
+      createMuiTheme({
+        palette: {
+          type: prefersDarkMode ? 'dark' : 'light',
+        },
+      }),
+    [prefersDarkMode],
+  );
 
   const classes = useStyles();
 
@@ -289,8 +334,34 @@ export default () => {
         </div>
         <Paper>
           {rows.map((row, index) => (
-            <Box display={'flex'} alignItems={'center'}>
-              <Typography display={'inline'}>{getTime(row.time)}</Typography>
+            <Box
+              display={'flex'}
+              alignItems={'center'}
+              className={classes.root}
+            >
+              {row.time ? (
+                <Typography display={'inline'}>{getTime(row.time)}</Typography>
+              ) : (
+                <TextField
+                  type="text"
+                  value={row.time}
+                  placeholder="请输入时间 HH:mm:ss"
+                  onChange={e => {
+                    const v = e.target.value;
+                    if (!v) {
+                      return;
+                    }
+                    const strings = v.split(':');
+                    if (strings.length != 3) {
+                      return;
+                    }
+                    const now = new Date();
+                    now.setHours(parseInt(strings[0]));
+                    now.setMinutes(parseInt(strings[1]), parseInt(strings[2]));
+                    update(index, { ...row, time: now.getTime() });
+                  }}
+                />
+              )}
               <Select
                 value={row.status}
                 onChange={e =>
@@ -300,9 +371,9 @@ export default () => {
                   })
                 }
               >
-                <MenuItem value={'start'}>开始做</MenuItem>
+                <MenuItem value={'start'}>开始</MenuItem>
                 <MenuItem value={'finish'}>结束</MenuItem>
-                <MenuItem value={'doing'}>正在做</MenuItem>
+                <MenuItem value={'doing'}>正在</MenuItem>
               </Select>
               <TextField
                 type="text"
@@ -314,10 +385,10 @@ export default () => {
                 {'用时 ' + formatSpan(rows, index)}
               </Typography>
               <IconButton onClick={() => remove(index)}>
-                <DeleteIcon />
+                <Close />
               </IconButton>
-              <IconButton>
-                <EditIcon />
+              <IconButton onClick={() => insert(index)}>
+                <Add />
               </IconButton>
             </Box>
           ))}
