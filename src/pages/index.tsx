@@ -77,6 +77,8 @@ type WorkState = [
   RemoveWork,
 ];
 
+type Span = [number, number, number];
+
 /**
  * 格式化时间戳，转成 HH:mm:ss 格式的时间
  *
@@ -90,7 +92,15 @@ function getTime(timestamp?: number) {
   return `${date.getHours()}:${date.getMinutes()}:${date.getSeconds()}.${date.getMilliseconds()}`;
 }
 
-function getSpan(rows: Work[], index: number): [number, number, number] {
+function toSpan(milliseconds: number): Span {
+  const second = milliseconds / 1000;
+  const s = second % 60;
+  const m = second > s ? ((second - s) / 60) % 60 : 0;
+  const h = second > second % 3600 ? second / 60 / 60 : 0;
+  return [Math.floor(h), Math.floor(m), s];
+}
+
+function getSpan(rows: Work[], index: number): Span {
   if (index < 1) {
     return [0, 0, 0];
   }
@@ -105,48 +115,110 @@ function getSpan(rows: Work[], index: number): [number, number, number] {
   if (curr.time < latest.time) {
     return [0, 0, 0];
   }
-  const span = curr.time - latest.time;
-  const second = span / 1000;
-  const s = second % 60;
-  const m = second > s ? ((second - s) / 60) % 60 : 0;
-  const h = second > second % 3600 ? second / 60 / 60 : 0;
-  return [Math.floor(h), Math.floor(m), s];
+  return toSpan(curr.time - latest.time);
 }
 
 function formatSpan(rows: Work[], index: number) {
   const [h, m, s] = getSpan(rows, index);
   let str = '';
   if (h) {
-    str += h.toFixed(0) + '小时';
+    str += h.toFixed(0) + ' 小时 ';
   }
   if (m) {
-    str += m.toFixed(0) + '分钟';
+    str += m.toFixed(0) + ' 分钟 ';
   }
   return `${str} ${s.toFixed(0)} 秒`;
 }
 
-function exportSpan(rows: Work[], index: number) {
-  let [h, m] = getSpan(rows, index);
-  console.info(1, h, m, index, rows);
-  for (let i = index - 1; i >= 0; i--) {
-    const r = rows[i];
-    console.log(2, r.desc);
-    if (r.desc) {
-      break;
+function exportSpan(rows: Work[]) {
+  const lines: { span: number; desc: string }[] = [];
+  let latestStatus: WorkStatus;
+  let latestTime: number;
+  let latestDesc: string;
+  rows.forEach(r => {
+    if (!r.time) {
+      return;
     }
-    const [h1, m1] = getSpan(rows, i);
-    console.log(3, h1, m1);
-    h += h1;
-    m += m1;
-  }
-  let str = '';
-  if (h) {
-    str += h.toFixed(0) + '小时';
-  }
-  if (m) {
-    str += m.toFixed(0) + '分钟';
-  }
-  return str;
+    if (!latestStatus) {
+      latestTime = r.time;
+      latestDesc = r.desc;
+      latestStatus = r.status;
+      return;
+    }
+    switch (latestStatus) {
+      case 'start':
+        switch (r.status) {
+          case 'start':
+            lines.push({ span: r.time - latestTime, desc: latestDesc });
+            latestTime = r.time;
+            latestDesc = r.desc;
+            return;
+          case 'finish':
+            lines.push({ span: r.time - latestTime, desc: latestDesc });
+            latestTime = r.time;
+            latestDesc = r.desc;
+            latestStatus = r.status;
+            return;
+          case 'doing':
+            if (!latestDesc && r.desc) {
+              latestDesc = r.desc;
+            }
+            latestStatus = r.status;
+            return;
+          default:
+        }
+        return;
+      case 'finish':
+        switch (r.status) {
+          case 'start':
+            latestStatus = r.status;
+            latestTime = r.time;
+            latestDesc = r.desc;
+            return;
+          case 'finish':
+            lines.push({ span: r.time - latestTime, desc: r.desc });
+            latestTime = r.time;
+            latestDesc = r.desc;
+            return;
+          case 'doing':
+            if (!latestDesc && r.desc) {
+              latestDesc = r.desc;
+            }
+            latestStatus = r.status;
+            return;
+          default:
+        }
+        return;
+      case 'doing':
+        switch (r.status) {
+          case 'finish':
+          case 'start':
+            lines.push({ span: r.time - latestTime, desc: latestDesc });
+            latestStatus = r.status;
+            latestTime = r.time;
+            latestDesc = r.desc;
+            return;
+          case 'doing':
+          default:
+        }
+        return;
+      default:
+        return;
+    }
+  });
+  return lines
+    .map(l => {
+      let str = '';
+      const [h, m] = toSpan(l.span);
+      if (h) {
+        str += h.toFixed(0) + '小时';
+      }
+      if (m) {
+        str += m.toFixed(0) + '分钟';
+      }
+      return `${l.desc}（${str}）`;
+    })
+    .join('\n');
 }
 
 class LocalWorkRepo {
@@ -263,17 +335,7 @@ export default () => {
   };
 
   const doExport = () => {
-    const content = rows
-      .map((r, index) => {
-        if (!r.desc) {
-          return null;
-        }
-        const span = exportSpan(rows, index);
-        return `${r.desc}（${span}）`;
-      })
-      .filter(s => !!s)
-      .join('\n');
-    setExportContent(content);
+    setExportContent(exportSpan(rows));
   };
 
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
