@@ -15,15 +15,8 @@ import Paper from '@material-ui/core/Paper';
 import '../sw';
 import styles from './index.less';
 import Container from '@material-ui/core/Container';
-import TableContainer from '@material-ui/core/TableContainer';
-import Table from '@material-ui/core/Table';
-import TableBody from '@material-ui/core/TableBody';
-import TableRow from '@material-ui/core/TableRow';
-import TableHead from '@material-ui/core/TableHead';
-import TableCell from '@material-ui/core/TableCell';
 import IconButton from '@material-ui/core/IconButton';
 import { Close, Add, Save } from '@material-ui/icons';
-import EditIcon from '@material-ui/icons/Edit';
 import { Box, MenuItem, Select, Typography } from '@material-ui/core';
 
 /**
@@ -224,31 +217,37 @@ const useStyles = makeStyles((theme: Theme) =>
 );
 
 const TimeEditor = (props: { onUpdate: (time: number) => void }) => {
-  const [value, setValue] = useState();
-
+  const [value, setValue] = useState<string>();
+  const save = () => {
+    const v = value;
+    if (!v) {
+      return;
+    }
+    const strings = v.split(':');
+    if (strings.length != 3) {
+      return;
+    }
+    const date = new Date();
+    date.setHours(parseInt(strings[0]));
+    date.setMinutes(parseInt(strings[1]), parseInt(strings[2]), 0);
+    let time = date.getTime();
+    if (isNaN(time)) {
+      return;
+    }
+    props.onUpdate(time);
+  };
   return (
-    <TextField
-      type="text"
-      value={value}
-      placeholder="请输入时间 HH:mm:ss"
-      onChange={e => {
-        const v = e.target.value;
-        if (!v) {
-          return;
-        }
-        const strings = v.split(':');
-        if (strings.length != 3) {
-          return;
-        }
-        const date = new Date();
-        date.setHours(parseInt(strings[0]));
-        date.setMinutes(parseInt(strings[1]), parseInt(strings[2]));
-        let time = date.getTime();
-        if (isNaN(time)) {
-        }
-        props.onUpdate(time);
-      }}
-    />
+    <>
+      <TextField
+        type="text"
+        value={value}
+        placeholder="请输入时间 HH:mm:ss"
+        onChange={e => setValue(e.target.value)}
+      />
+      <IconButton onClick={save}>
+        <Save />
+      </IconButton>
+    </>
   );
 };
 
@@ -342,24 +341,8 @@ export default () => {
               {row.time ? (
                 <Typography display={'inline'}>{getTime(row.time)}</Typography>
               ) : (
-                <TextField
-                  type="text"
-                  value={row.time}
-                  placeholder="请输入时间 HH:mm:ss"
-                  onChange={e => {
-                    const v = e.target.value;
-                    if (!v) {
-                      return;
-                    }
-                    const strings = v.split(':');
-                    if (strings.length != 3) {
-                      return;
-                    }
-                    const now = new Date();
-                    now.setHours(parseInt(strings[0]));
-                    now.setMinutes(parseInt(strings[1]), parseInt(strings[2]));
-                    update(index, { ...row, time: now.getTime() });
-                  }}
+                <TimeEditor
+                  onUpdate={time => update(index, { ...row, time: time })}
                 />
               )}
               <Select
