@@ -263,17 +263,17 @@ export default () => {
   };
 
   const doExport = () => {
-    // const content = rows
-    //   .map((r, index) => {
-    //     if (!r.desc) {
-    //       return null;
-    //     }
-    //     const span = exportSpan(rows, index);
-    //     return `${r.desc}（${span}）`;
-    //   })
-    //   .filter(s => !!s)
-    //   .join('\n');
-    // setExportContent(content);
+    const content = rows
+      .map((r, index) => {
+        if (!r.desc) {
+          return null;
+        }
+        const span = exportSpan(rows, index);
+        return `${r.desc}（${span}）`;
+      })
+      .filter(s => !!s)
+      .join('\n');
+    setExportContent(content);
   };
 
   const prefersDarkMode = useMediaQuery('(prefers-color-scheme: dark)');
